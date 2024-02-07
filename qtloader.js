@@ -64,6 +64,7 @@
  * @see https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/emscripten for
  *      EmscriptenModule
  */
+var loadingPercent=0
 async function qtLoad(config)
 {
     const throwIfEnvUsedButNotExported = (instance, config) =>
@@ -118,9 +119,13 @@ async function qtLoad(config)
             } catch (e) {
                 circuitBreakerReject(e);
             }
+            
+            
         }
     }
-
+    
+    loadingPercent+=25
+    update()
     const originalPreRun = config.preRun;
     config.preRun = instance =>
     {
@@ -153,6 +158,9 @@ async function qtLoad(config)
             makeDirs(instance.FS, destination);
             instance.FS.writeFile(destination, new Uint8Array(data));
         }
+        
+        loadingPercent+=25
+        update()
     };
 
     config.onRuntimeInitialized = () => config.qt.onLoaded?.();
@@ -186,19 +194,25 @@ async function qtLoad(config)
             crashed: true
         });
     };
-
+    
+    
     const fetchPreloadFiles = async () => {
         const fetchJson = async path => (await fetch(path)).json();
         const fetchArrayBuffer = async path => (await fetch(path)).arrayBuffer();
         const loadFiles = async (paths) => {
             const source = paths['source'].replace('$QTDIR', config.qt.qtdir);
+            
             return {
+            
                 destination: paths['destination'],
                 data: await fetchArrayBuffer(source)
             };
         }
         const fileList = (await Promise.all(config.qt.preload.map(fetchJson))).flat();
         self.preloadData = (await Promise.all(fileList.map(loadFiles))).flat();
+        
+        loadingPercent+=25
+        update()
     }
 
     await fetchPreloadFiles();
@@ -207,6 +221,9 @@ async function qtLoad(config)
     // runtime script or be customized as needed.
     let instance;
     try {
+    	
+        loadingPercent+=25
+        update()
         instance = await Promise.race(
             [circuitBreaker, config.qt.entryFunction(config)]);
     } catch (e) {
@@ -219,7 +236,13 @@ async function qtLoad(config)
 
     return instance;
 }
+function update() {
+      var element = document.getElementById("progressBar");
+      var label=document.getElementById("percent");
+        element.style.width=loadingPercent+'%'
+        label.innerHTML = loadingPercent+'%';
 
+  }
 // Compatibility API. This API is deprecated,
 // and will be removed in a future version of Qt.
 function QtLoader(qtConfig) {
